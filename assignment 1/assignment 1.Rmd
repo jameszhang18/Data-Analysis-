@@ -1,0 +1,270 @@
+---
+title: "STA 303 Assignment 1"
+author: "Guanchen Zhang"
+date: "July 14, 2018"
+header-includes:
+    - \usepackage{amsmath}
+    - \usepackage{commath}
+    - \usepackage{geometry}
+    - \usepackage{setspace}
+    - \onespacing
+    - \geometry{top=1in}
+    - \newcommand{\ed}{\overset{d}{=}}
+    - \newcommand{\cp}{\overset{p}{\rightarrow}}
+    - \newcommand{\cd}{\overset{d}{\rightarrow}}
+    - \renewcommand{\baselinestretch}{1.5}
+    - \newcommand{\mb}[1]{\ensuremath{\boldsymbol{\mathbf{#1}}}}
+    - \usepackage{sectsty} \sectionfont{\centering \emph}
+    - \usepackage{xcolor}
+    - \usepackage{fetamont}
+    - \newcommand*\eiadfamily{\fontencoding{OT1}\fontfamily{times}\selectfont}
+    - \newcommand{\mytitle}{\eiadfamily}
+    - \newcommand{\myauthor}{\ffmfamily \textcolor{blue}}
+    - \pretitle{\vspace{\droptitle}\centering\eiadfamily\emph}
+    - \usepackage{multicol}
+output: 
+  pdf_document:
+    keep_tex: true
+---
+
+\fontsize{12}{12}
+\selectfont
+
+```{r setup, include=FALSE ,echo = FALSE}
+rm(list = ls())
+library(tidyverse)
+library(ggplot2)
+library(MASS)
+```
+
+## Gauge Calibration
+
+To monitor the water supply,people wants to analysize the snow-pack profile because show absorb the water up to a certain point, after which the water floods away. The snow gauge is used to determine a depth profile of snow density but does not directly measure snow density. The experimental data were acquired by varying density and measuring the gain. In the experiment, the polyethylene blocks are used to simulate snow whose density was recorded in dataset. The gauge measurement is called "gain".
+
+In the context of the problem, a statistical model is necessay and ther is no alternative way. In general, linear regression has following assumptions: Linear relationship, Multivariate normality, No multicollinearity (no need in this case), No auto-correlation (no need in this case), Homoscedasticity. 
+A simple linear regression model called fit1 was built to estimate mean density at a given gain. From the diagnostic plots of the fit1 model, there is a distinctive curvilinear pattern in the residual vs. fitted plot (figure 1.2). This could mean that we may get a better model is we try a  model with a quadratic term included. The assumption of equal variance does not hold under the model of fit1.
+
+When the variance is found to be nonconstant, we can consider to use transformation to stabilize variance. Also because the relationship between the response and the design variable is not linear, it is possible that a transormataion can put the relationship into a linear form. According to the boxcox function in R, a log transformation is recommended since the lamda is 0 which is acceptable for the log transformation. The resulting scatter plot has points forming a nearly perfect straightline, indicating an almost linear relationship. All assumptions for linear regression hold under the model of fit2.
+
+Since the scatter plot is curved, a polynomial model may be appropriate. However, the physical model for the relationship between gain and density suggests proceeding with the log transformation.
+
+Then we can conclude that to estimate mean density of snow pack at given gain we can use the model depicted as fit2 by taking log to "gain".   
+
+
+
+## Appendix
+
+We first need to coerce other objects to a data frame and glimpse at the data frame (table 1.1). There are 90 observations and 2 variables which are density and gain. 
+
+Then, a scatter plot of density by gain was plotted (figure 1.1), which indicates there is a curvilinear relationship instead of linear relationship where the density decrease exponentially when the gain increase. 
+
+### Table 1.1 Glimpse
+```{r, fig.width=3.5, fig.height=3.5, echo = FALSE}
+data = read.table(file="https://www.stat.berkeley.edu/~statlabs/data/gauge.data", header=T)
+data_t <- as_data_frame(data)
+glimpse(data_t)
+
+```
+
+
+
+```{r, fig.width=3.5, fig.height=3.5, echo = FALSE}
+ggplot(data_t, aes(x=gain, y=density)) +
+  geom_point(shape=1) +    # Use hollow circles
+  geom_smooth(method=lm,   # Add linear regression line
+              se=FALSE) +
+  theme_classic() +
+  labs(title = " Figure 1.1 Linear Regression Model",
+       x = "Gain",
+       y = "Density"
+  )
+```
+The assumption of normal errors is needed and can be checked by QQ plot (figure 1.3). In the normal QQ plot (figure 1.3) produces points close to a straight line so the data are said to be consistent with that from a normal distribution. Another assumption is that the errors have constant variance. In the residual vs. fitted plot (figure 1.2), the residuals are not spread equally around 0, indicating the assumption of equal variance is violated. 
+
+
+### Table 1.2 ANOVA of fit1
+```{r, fig.width=3.5, fig.height=3.5, echo = FALSE}
+fit1<-lm(density~gain,data=data_t)
+anova(fit1)
+data_frame(resid = residuals(fit1),
+           fitted = fitted(fit1)) %>%
+  mutate_at("resid",funs( (. - mean(.)) / sd(.))) %>%
+  ggplot(aes(x = fitted,y = resid)) +
+  theme_classic() +
+  geom_point() +
+  geom_smooth(method="loess") +
+  geom_hline(yintercept = 0) +
+  geom_hline(yintercept = -2,linetype="dashed",colour="red") +
+  geom_hline(yintercept = 2,linetype="dashed",colour="red") +
+  labs(title = "Figure 1.2 Residuals vs Fitted Values",
+       subtitle = "Normal linear model of density by gain",
+       x = "Fitted Values",
+       y = "Residuals")
+#refer to lecture5-r-code-1.R at line 54-67
+
+data_t %>%
+  mutate_at("density",funs( (. - mean(.)) / sd(.))) %>%
+  arrange(density) %>%
+  mutate(q = qnorm(1:n() / (n() + 1))) %>%
+  ggplot(aes(x = q,y = density)) +
+  theme_classic() +
+  geom_point() +
+  geom_abline(slope = 1,intercept = 0) +
+  labs(title = "Figure 1.3 Normal QQ-plot",
+       subtitle = "Normal linear model of density by gain",
+       x = "Theoretical Quantiles",
+       y = "Sample Quantiles") 
+#refer to lecture2-3-r-code-1.R at line 105-115
+
+
+  
+
+```
+
+
+
+
+
+In the residual vs. fitted plot (figure 1.6), the residuals are spread equally around 0, indicating the assumption of equal variance is hold and the curvilinear pattern is not such obvious as the original model. Meanwhile, the assumption of normal errors is improved in the QQ plot (figure 1.5). Moreover, because the smaller the residual sum of squares, the better your model fits your data, comparing ANOVA of fit1 (table 1.2) with that of fit2 (table 1.3), the residual sum of squres of the fit2 is much smaller than that of fit1 and more closer to 0.
+
+### Table 1.3 ANOVA of fit2
+``` {r, fig.width=3.5, fig.height=3.5, echo = FALSE}
+fit2 <-lm(density~I(log(gain)),data=data_t)
+anova(fit2)
+gain_boxcox <- boxcox(gain ~ 1,data=data_t)
+gain_boxcox$x[which(gain_boxcox$y == max(gain_boxcox$y))]
+
+
+ggplot(data_t, aes(x=I(log(gain)), y=density)) +
+  geom_point(shape=1) +    # Use hollow circles
+  geom_smooth(method=lm,   # Add linear regression line
+              se=FALSE) +
+  theme_classic() +
+  labs(title = "Figure 1.4 Log Regression Model",
+       x = "Log(Gain)",
+       y = "Density"
+  )
+
+data_t %>%
+  mutate_at("density",funs( (. - mean(.)) / sd(.))) %>%
+  arrange(density) %>%
+  mutate(q = qnorm(1:n() / (n() + 1))) %>%
+  ggplot(aes(x = q,y = density)) +
+  theme_classic() +
+  geom_point() +
+  geom_abline(slope = 1,intercept = 0) +
+  labs(title = "Figure 1.5 Normal QQ-plot",
+       subtitle = "Normal linear model of density by log(gain)",
+       x = "Theoretical Quantiles",
+       y = "Sample Quantiles") #refer to lecture2-3-r-code-1.R at line 105-115
+
+data_frame(resid = residuals(fit2),
+           fitted = fitted(fit2)) %>%
+  mutate_at("resid",funs( (. - mean(.)) / sd(.))) %>%
+  ggplot(aes(x = fitted,y = resid)) +
+  theme_classic() +
+  geom_point() +
+  geom_smooth(method="loess") +
+  geom_hline(yintercept = 0) +
+  geom_hline(yintercept = -2,linetype="dashed",colour="red") +
+  geom_hline(yintercept = 2,linetype="dashed",colour="red") +
+  labs(title = "Figure 1.6 Residuals vs Fitted Values",
+       subtitle = "Normal linear mode of density by log(gain)",
+       x = "Fitted Values",
+       y = "Residuals")
+
+#refer to lecture5-r-code-1.R at line 54-67
+  
+
+```
+
+
+
+## Dugeness crabs
+
+Dugeness crabs are fished extensively and fisihing female crabs is a possible means of controlling hte fluctuation in yearly catches of crabs. To determine size restrictions for female crabs, we are trying to estimate mean carapace size for crabs who have recently molted, for those who have not, and whether the difference is significant.
+The shell width was recorded as "size" in the dataset and information on whether the crab had molted in the most recent molting season or not was recorded as dummy variable called "shell". According to the background reading, "shell" is 0 means the crab has a fouled shell indicating it had molted in the most recent molting season, whereas, 1 means the crab has a clean shell, indicating it had not molted in the most recent molting season.
+
+A box plot (Figure 2.1) is drawn as well which enable us to study the distributional characteristics of the group of the variable and provide some indication of the data's symmetry and skewness. Unlike other methods of data display, boxplots show outliers. By using a boxplot for each categorical variable side-by-side, it is easy to compare data set.
+
+Regarding the problem of the crab growth, ANOVA is used to assess the relationship between a continuous and categorical variable, unlike the linear regression model used to solve the problem of gauge calibration where both the dependent variable and the independent variable are continuous. 
+
+Then we can conclude that estimated mean carapace size for crabs who have recently molted is 142cm, for those who have not is 149cm, and there is significant evidence that whether the female crab had molted in the most recent molting season or not impact on the width of the female crab.
+
+
+## Appendix 
+
+In general, the shape of the box are different between fouled shell and clean shell crab. Comparing the box for clean shell, the box for fouled shell is much shorter, suggesting that size of fouled shell carbs have a high level of agreement with each other, meanwhile, it is much higher, suggesting a difference between groups. Regarding the boxplot for clean shell carbs, the box are uneven in size, showing that many carbs have similar sizes at certain parts of the scale, but in other parts of the parts of scale sizes of clean carbs vary much. Outliers are very noticable for the carbs with fouled shell.
+### Table 2.1 Glimpse
+```{r ,echo = FALSE}
+crabs<-readr::read_table("https://www.stat.berkeley.edu/users/statlabs/data/crabpop.data",col_types = "dc")
+crabs_t<-as_data_frame(crabs)
+glimpse(crabs_t)
+
+```
+
+
+```{r,echo = FALSE,fig.width = 3, fig.height = 3}
+ggplot(crabs_t, aes(x = shell,y = size)) +
+  theme_classic() +
+  geom_boxplot() +
+  labs(title = "Figure 2.1 Boxplot of size by shell",
+       x = "shell",
+       y = "size"
+  ) #refer to lecture2-3-r-code-1.R at line 20-28
+```
+
+
+### Table 2.2 Grand statistics
+```{r,echo = FALSE}
+# Grand mean and standard deviation
+summarize(crabs_t,grand_mean = mean(size),grand_sd = sd(size))
+```
+### Table 2.3 Group statistics
+```{r,echo = FALSE}
+g <- lm (size ~ shell,crabs_t)
+summary(g)
+group_by(crabs_t, shell) %>%
+  summarise(
+    count = n(),
+    median = median(size, na.rm = TRUE),
+    mean = mean(size, na.rm = TRUE),
+    sd = sd(size, na.rm = TRUE)
+  )
+```
+
+In the ANOVA table(table 2.4), as the p-value is less than the significance level 0.05, we can conclude that there are significant differences between the group of fouled shell carbs and the group of clean shell carbs. Since there are only 2 groups, it is not necessary to perform multiple pairwise-comparison, to determine if the mean difference between specific pairs of group are statistically significant.
+
+
+The ANOVA test assumes that, the data are normally distributed and the variance across groups are homogeneous. 
+From the output (table 2.5) we can see that the p-value is not less than the significance level of 0.05. This means that there is no evidence to suggest that the variance across groups is statistically significantly different. Therefore, the assumption of homogeneity of variances in the different treatment groups holds.
+Anova assumes that the data in each group are distributed normally. This assumption is equivalent saying that the residuals of the best-fitting model are distributed normally. In the normal QQ plot (Figure 2.2), as almost all the points fall approximately along this reference line, the assumption holds.
+
+### Table 2.4 ANOVA table
+```{r,echo = FALSE}
+crabs_aov <-aov(size ~ shell, data=crabs_t)
+summary(crabs_aov)
+```
+
+```{r, fig.width=3.5, fig.height=3.5, echo = FALSE}
+crabs_t %>%
+  mutate_at("size",funs( (. - mean(.)) / sd(.))) %>%
+  arrange(size) %>%
+  mutate(q = qnorm(1:n() / (n() + 1))) %>%
+  ggplot(aes(x = q,y = size)) +
+  theme_classic() +
+  geom_point() +
+  geom_abline(slope = 1,intercept = 0) +
+  labs(title = "Figure 2.2 Normal QQ-plot",
+       x = "Theoretical Quantiles",
+       y = "Sample Quantiles") #refer to lecture2-3-r-code-1.R at line 105-115
+
+```
+
+### Table 2.5 Equal variance test
+```{r, echo = FALSE}
+bartlett.test(size~shell,data=crabs_t)
+
+
+```
+

@@ -1,0 +1,162 @@
+---
+title: "STA303 Assignment2"
+author: "Guanchen Zhang"
+date: "August 4, 2018"
+header-includes:
+    - \usepackage{amsmath}
+    - \usepackage{commath}
+    - \usepackage{geometry}
+    - \geometry{top=1in}
+
+output: 
+  pdf_document:
+    keep_tex: true
+sansfont: Times New Roman
+---
+
+\fontsize{12}{12}
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Dataset 1
+To predict whether prostate cancer has spread to neighbouring lymph node, we recorded and studied five binary explanatory variables of 53 patients with prostate cancer. The five binary explanatory variables include: age (0 = less than 60, 1 = 60 or more); stage (0=less serious tumour, 1 = more serious); grade (0=less serious patholohy of tumour,1=more serious); xray (0=less serious, 1=more serious); acid (0=less than 0.6 of serum acid phosphatase, 1=0.6 or more).
+
+It is not possible to make a causal conclusion about the relationship of each predicor with nodal involvement based on these data because the purpose for regression is to study the correlation relationships, however, correlation does not necessary mean causation, which tries to estimate the effect of intervention.
+
+We want to do a predictive anlysis on nodal involvment, therefore, regression analysis should be used. Since the dependent variable (r in this context) is binary, logistic regression is most appropriate to use.
+The binary logistic regression model assumes 1) the dependent variable should be dichotomous 2) the observations to be independent of each other 3) little or not multicollinearity among the independent variables 4)There is a linear relationship between the logit of the outcome and each predictor variables 5)$Var(y_i) = n_ip_i(1-p_i)$.
+The assumption 1) and 2) is satisfied because each data entry means an individual. Based on the correlation matrix (table 1.2), there is little multicollinearity among the independent variables. The linearity assumption holds based on Figure 1.1, the smoothed scatter plots show that variables are linearly associated with the outcome in logit scale, but since the sample size is small, the result is not informative.
+
+By performing a stepwise variable selection, we can get a simpler model (nodal_glm2) that is better than a model including all predictors (nodal_glm). In detail, we build regression model from a set of candidate predictor variables by entering predictors in a stepwise manner into a null model where AIC criterion is used for evaluating subsets of variables. Comparing the AIC of nodal_glm model (59.611) to AIC of simpler model (57.18), the simpler nodal_glm2 indeed is better. The reason to compare AIC instead of deviance is that larger model always implies smaller deviance but AIC compensate for that. Hence, we are suggested that only predictors of stage, xray and acid have a apparent relationship with nodal involvment. Then we performed the likelihood ratio test, the simpler mode fits as well as the saturated model and better than null model. Also, the null model doesn't fit the data as well as the saturated model. However, we should not rely on this goodness-of-fit measurement because deviance depends on beta_hat rather than contrasting the data with fitted model. Another reason is that if the data are modelled into binomial format, the degrees of freedom of fitted model would change.
+
+To conclude, though the spread of cancer to neighbouring lymph nodes for patients with prostate cancer seems to have a relationship with seriousness of tumour(stage),xray and level of serum acid phosphatase(acid), we still cannot make a conclusive treatment strategy because of lack of data and low reliability on goodness-of-fit measurement of binary data.
+
+## Appendix 1
+```{r, echo=FALSE}
+rm(list = ls())
+
+suppressMessages({
+  suppressWarnings({
+    library(tidyverse)
+    library(SMPracticals)
+  })
+})
+
+```
+#### Table 1.1 Glimpse data
+```{r, echo=FALSE}
+data(nodal)
+nodal_tbl <- as_data_frame(nodal)
+glimpse(nodal_tbl)
+
+```
+#### Table 1.2 Correlation matrix of predictors
+```{r, echo=FALSE}
+nodal_tbl[] <- lapply(nodal_tbl,as.integer)
+
+round(cor(nodal_tbl %>% dplyr::select(-r,-m)),2)
+
+```
+
+```{r, echo=FALSE}
+nodal_glm <- glm(r~aged+stage+grade+xray+acid,family=binomial,data=nodal_tbl)
+summary(nodal_glm)
+
+```
+
+```{r, echo=FALSE}
+nodal_glm2 <- step(nodal_glm,lower = glm(r~1,data=nodal_tbl,family=binomial))
+summary(nodal_glm2)
+Dstat2 <- nodal_glm2$null.deviance - deviance(nodal_glm2)
+1- pchisq(Dstat2,3)
+1 - pchisq(deviance(nodal_glm2),49)
+1 - pchisq(nodal_glm2$null.deviance,52)
+
+## refer to Alex's lecture4_rcode-1.R
+```
+
+
+```{r, echo=FALSE,fig.width=3.5, fig.height=3.5}
+probabilities <- predict(nodal_glm2, type = "response")
+predictors <- colnames(nodal_tbl)
+# Bind the logit and tidying the data for plot
+nodal_tbl <- nodal_tbl %>%
+  dplyr::select(-r,-m) %>%
+  mutate(logit = log(probabilities/(1-probabilities))) %>%
+  gather(key = "predictors", value = "predictor.value", -logit)
+  
+
+
+ggplot(nodal_tbl, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  theme_bw() + 
+  labs(title = " Figure 1.1 ")+
+  facet_wrap(~predictors, scales = "free_y")
+
+```
+
+
+## Dataset 2
+To study how age, smoking and survival related to each other, these 3 factors of 1314 women in Whickham were recorded in 1972-1974 and twenty years later a follow-up survey was conducted to determine the mortality of the origin participants.
+
+In this context, because the relationship between the variables is more symmetric and there is no implicitly assumption on association between smoer and age, poisson regression model is preferred to investigate how 3 factors interact. If we want one factor being identified as the response, we would prefer binomial model but it is not our case. Therefore, we need to transform the original data frame to fit a poisson model (table2.4). 
+Firstly, we consider if all 3 variables are independent, say, mutual independence, corresponding to the main effects-only model smoke_glm1. Then considering the joint independence, though there are many possible case, we prefer to suppose smoking and death are dependent but jointly independent of age which makes most sense. This represents a small improvement over mutual independence since XXX, but the degree of freedom of deviance is still high. Finally, we consider the conditional independence which suppose smoking is independent of life status given age. The deviance is slightly larger than degree of freedon and smaller than the deviance of previous 2 models, indicating a better fit.
+
+From Table2.3, 76% smokers have survived for 20 years while only 69% nonsmokers have survived, which intuitively indicating smoking have a beneficial effect. But once we consider the relationship within age group, the advantage to nonsmoker over smoker is obvious. From table2.1 and 2.2, within the same age group, there are always more smokers died than nonsmokers. There is a difference between the case when we marginalize the age and the case when we control for age, which might result from the fact that smokers are more concentrated in the younger age group and old people were more likely to pass away after 20 years no matter whether they smoke or not.
+Therefore, it is dangerous to ignore/marginalize over variables without first examining the full dependence structure. For example in this case, marginalizing the age group veils the condition for dependence structure, ending up with the opposite experiment result.
+
+To conclude, in 20 year long period, smoking is independent of life status given age and within each age group, smoking has a harmful effect on life status compared to nonsmoking.
+
+## Appendix 2
+```{r, echo=FALSE}
+data(smoking)
+smoking_tbl <- as_data_frame(smoking)
+
+```
+#### Table 2.1
+```{r, echo=FALSE}
+xtabs(cbind(dead,alive) ~ smoker + age,data = smoking_tbl)
+```
+#### Table 2.2
+```{r, echo=FALSE}
+xtabs(cbind(dead,alive) ~ smoker + age,data = smoking_tbl) %>% prop.table(2)%>% round(2)
+```
+#### Table 2.3
+```{r, echo=FALSE}
+xtabs(cbind(dead,alive) ~ smoker,data = smoking_tbl) %>% prop.table(1)%>% round(2)
+## refer to Alex's lecture6_rcode-1.R
+```
+#### Table 2.4 Transformed data frame
+```{r, echo=FALSE}
+smoking_tbl %>% mutate_if(is.factor, as.character) -> smoking_tbl
+smoking_tbl2 <- data.frame("y"=double(),"age"=character(),"smoker"=double(),"dead"=double(),stringsAsFactors=FALSE)
+i<-1
+for (row in 1:nrow(smoking_tbl)){
+  smoking_tbl2[i,] <- c(smoking_tbl[row,"dead"],as.character(smoking_tbl[row,"age"]),smoking_tbl[row,"smoker"],1)
+  smoking_tbl2[i+1,] <- c(smoking_tbl[row,"alive"],as.character(smoking_tbl[row,"age"]),smoking_tbl[row,"smoker"],0)
+  i = i+2
+  }
+smoking_tbl2$age<-as.factor(smoking_tbl2$age)
+glimpse(smoking_tbl2)
+
+#Mutual Independence
+smoke_glm1 <- glm(y ~ smoker + age + dead,data = smoking_tbl2,family = poisson)
+summary(smoke_glm1)
+
+# Joint independence: smoking and death jointly independent of age
+smoke_glm2 <- glm(y ~ smoker * dead + age,data = smoking_tbl2,family = poisson)
+summary(smoke_glm2)
+
+smoke_glm3 <- glm(y ~ smoker * age + dead * age,data = smoking_tbl2,family = poisson)
+summary(smoke_glm3)
+```
+#### Table 2.5 ANOVA table
+```{r, echo=FALSE}
+anova(smoke_glm1,smoke_glm2,smoke_glm3)
+# refer to Alex's lecture6_rcode-1.R
+```
+
